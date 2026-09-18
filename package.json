@@ -1,0 +1,7 @@
+{
+  "name": "tubelocal",
+  "version": "2.0.0",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "youtubei.js": "^10.1.0" }
+}   

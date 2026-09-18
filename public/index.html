@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TubeLocal</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f0f0f;--sf:#1e1e1e;--sf2:#2c2c2c;--tx:#f1f1f1;--tx2:#aaa;--ac:#3ea6ff;--rd:#ff0033;--r:12px}
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh}
+.hdr{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--sf2);padding:10px 16px;display:flex;align-items:center;gap:12px}
+.logo{font-size:20px;font-weight:700;cursor:pointer;white-space:nowrap}
+.logo span{color:var(--rd)}
+.sb{flex:1;max-width:600px;display:flex}
+.sb input{flex:1;padding:10px 16px;border:1px solid var(--sf2);border-radius:24px 0 0 24px;background:var(--sf);color:var(--tx);font-size:15px;outline:none}
+.sb input:focus{border-color:var(--ac)}
+.sb button{padding:10px 20px;border:none;border-radius:0 24px 24px 0;background:var(--sf2);color:var(--tx);cursor:pointer;font-size:15px}
+.mn{padding:16px;max-width:1600px;margin:0 auto}
+.gr{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.cd{cursor:pointer;border-radius:var(--r);overflow:hidden;transition:transform .15s}
+.cd:hover{transform:scale(1.02)}
+.cd .th{position:relative;aspect-ratio:16/9;background:var(--sf);overflow:hidden}
+.cd .th img{width:100%;height:100%;object-fit:cover}
+.cd .th .du{position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,.8);padding:2px 6px;border-radius:4px;font-size:12px;font-weight:600}
+.cd .in{padding:12px}
+.cd .in .t{font-size:15px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:4px}
+.cd .in .ch{font-size:13px;color:var(--tx2)}
+.cd .in .st{font-size:13px;color:var(--tx2)}
+.wt{display:grid;grid-template-columns:1fr 400px;gap:24px}
+@media(max-width:1000px){.wt{grid-template-columns:1fr}}
+.pl{aspect-ratio:16/9;background:#000;border-radius:var(--r);overflow:hidden}
+.pl video{width:100%;height:100%}
+.wt1{font-size:20px;font-weight:700;margin:16px 0 8px}
+.wm{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.cb{display:flex;align-items:center;gap:10px;padding:8px 16px;background:var(--sf2);border-radius:20px;cursor:pointer;border:none;color:var(--tx);font-size:14px}
+.cb:hover{background:#444}
+.ds{background:var(--sf);padding:16px;border-radius:var(--r);margin-top:16px;font-size:14px;line-height:1.6;white-space:pre-wrap;max-height:200px;overflow-y:auto}
+.rl h3{font-size:16px;margin:20px 0 12px}
+.rl2{display:flex;flex-direction:column;gap:8px}
+.ri{display:flex;gap:10px;cursor:pointer;padding:6px;border-radius:8px}
+.ri:hover{background:var(--sf)}
+.ri .t{width:160px;aspect-ratio:16/9;border-radius:8px;overflow:hidden;flex-shrink:0}
+.ri .t img{width:100%;height:100%;object-fit:cover}
+.ri .i{flex:1;min-width:0}
+.ri .i .t2{font-size:14px;font-weight:600;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ri .i .m{font-size:12px;color:var(--tx2);margin-top:4px}
+.chh{display:flex;align-items:center;gap:20px;padding:24px;margin-bottom:20px}
+.chh .av{width:100px;height:100px;border-radius:50%;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-size:40px}
+.chh h1{font-size:28px}
+.chh .su{color:var(--tx2);font-size:15px}
+.ld{text-align:center;padding:60px;color:var(--tx2)}
+.sp{width:40px;height:40px;border:3px solid var(--sf2);border-top-color:var(--ac);border-radius:50%;animation:s .8s linear infinite;margin:0 auto 16px}
+@keyframes s{to{transform:rotate(360deg)}}
+.er{text-align:center;padding:40px;background:var(--sf);border-radius:var(--r);margin:20px}
+.er button{margin-top:12px;padding:10px 20px;border-radius:8px;border:none;background:var(--ac);color:#fff;cursor:pointer}
+h2{margin-bottom:16px;font-size:22px}
+</style>
+</head>
+<body>
+<header class="hdr">
+<div class="logo" onclick="go('home')">Tube<span>Local</span></div>
+<div class="sb"><input id="q" placeholder="動画を検索..." onkeydown="if(event.key==='Enter')doS()"><button onclick="doS()">🔍</button></div>
+</header>
+<main id="app" class="mn"></main>
+<script>
+function go(p,pa){history.pushState({p,pa},'');render(p,pa);window.scrollTo(0,0)}
+window.onpopstate=e=>{const s=e.state||{p:'home'};render(s.p,s.pa)}
+function doS(){const q=document.getElementById('q').value.trim();if(q)go('search',q)}
+async function api(p){const r=await fetch(p);const d=await r.json();if(d.error)throw new Error(d.error);return d}
+function render(p,pa){const a=document.getElementById('app');if(p==='home')return rH(a);if(p==='watch')return rW(a,pa);if(p==='channel')return rC(a,pa);if(p==='search')return rS(a,pa);rH(a)}
+const L=m=>`<div class="ld"><div class="sp"></div><p>${m||'読み込み中...'}</p></div>`;
+const E=m=>`<div class="er"><h3>⚠️ エラー</h3><p>${m}</p><button onclick="location.reload()">再試行</button></div>`;
+function cd(v){return`<div class="cd" onclick="go('watch','${v.id}')"><div class="th"><img src="${v.thumbnail}" loading="lazy">${v.duration?`<span class="du">${v.duration}</span>`:''}</div><div class="in"><div class="t">${v.title}</div><div class="ch">${v.channel}</div><div class="st">${v.views||''}${v.published?' · '+v.published:''}</div></div></div>`}
+async function rH(a){a.innerHTML=L('おすすめを読み込み中...');try{const d=await api('/api/search?q='+encodeURIComponent('人気動画'));a.innerHTML=`<h2>🔥 おすすめ</h2><div class="gr">${d.map(cd).join('')}</div>`}catch(e){a.innerHTML=E(e.message)}}
+async function rS(a,q){a.innerHTML=L(`"${q}" を検索中...`);try{const d=await api('/api/search?q='+encodeURIComponent(q));a.innerHTML=`<h2>🔍 "${q}" (${d.length}件)</h2><div class="gr">${d.map(cd).join('')}</div>`}catch(e){a.innerHTML=E(e.message)}}
+async function rW(a,id){a.innerHTML=L('動画を取得中...');try{const v=await api('/api/video/'+id);a.innerHTML=`<div class="wt"><div><div class="pl">${v.streamProxy?`<video controls autoplay src="${v.streamProxy}"></video>`:'<p style="padding:20px;color:#aaa">ストリーム取得不可</p>'}</div><h1 class="wt1">${v.title}</h1><div class="wm"><button class="cb" onclick="go('channel','${v.channelId}')">${v.channel}</button><span style="color:var(--tx2);font-size:14px">${v.views} 回</span></div>${v.description?`<div class="ds">${v.description}</div>`:''}</div><div class="rl"><h3>関連動画</h3><div class="rl2">${v.related.map(r=>`<div class="ri" onclick="go('watch','${r.id}')"><div class="t"><img src="${r.thumbnail}" loading="lazy"></div><div class="i"><div class="t2">${r.title}</div><div class="m">${r.channel}<br>${r.views||''} ${r.duration||''}</div></div></div>`).join('')}</div></div></div>`}catch(e){a.innerHTML=E(e.message)}}
+async function rC(a,id){a.innerHTML=L('チャンネルを読み込み中...');try{const c=await api('/api/channel/'+id);a.innerHTML=`<div class="chh"><div class="av">👤</div><div><h1>${c.name}</h1><p class="su">${c.subscriberCount||''}</p></div></div><div class="gr">${c.videos.map(cd).join('')}</div>`}catch(e){a.innerHTML=E(e.message)}}
+render('home');
+</script>
+</body>
+</html>   

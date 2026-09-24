@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Tube</title>
+<title>MyTube</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0f0f0f;--sf:#212121;--sf2:#121212;--bd:#3f3f3d;--tx:#f1f1f1;--sub:#aaa;--ac:#ff0000;--hov:#3d3d3d;--chip:#272727}
@@ -26,7 +26,7 @@ button{font-family:inherit;cursor:pointer}
 .search-form .s-btn:hover{background:var(--hov)}
 .avatar{width:32px;height:32px;border-radius:50%;background:#7c4dff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;color:#fff}
 
-#sidebar{position:fixed;top:56px;left:0;bottom:0;width:240px;background:var(--bg);overflow-y:auto;padding:12px 0;z-index:900;transition:transform .2s}
+#sidebar{position:fixed;top:56px;left:0;bottom:0;width:240px;background:var(--bg);overflow-y:auto;padding:12px 0;z-index:900;transition:width .2s}
 #sidebar.collapsed{width:72px}
 #sidebar.collapsed .s-item span:last-child{display:none}
 #sidebar.collapsed .s-item{justify-content:center;padding:14px 0}
@@ -119,32 +119,32 @@ button{font-family:inherit;cursor:pointer}
 
 <nav id="sidebar">
   <div class="s-item active" onclick="goHome()"><span class="s-icon">🏠</span><span>ホーム</span></div>
-  <div class="s-item" onclick="doSearchWith('shorts')"><span class="s-icon">⚡</span><span>Shorts</span></div>
-  <div class="s-item" onclick="doSearchWith('登録チャンネル')"><span class="s-icon">📺</span><span>登録チャンネル</span></div>
+  <div class="s-item" onclick="searchWith('shorts')"><span class="s-icon">⚡</span><span>Shorts</span></div>
+  <div class="s-item" onclick="searchWith('ライブ配信')"><span class="s-icon">📺</span><span>登録チャンネル</span></div>
   <div class="s-divider"></div>
   <div class="s-label">あなた</div>
-  <div class="s-item" onclick="doSearchWith('履歴')"><span class="s-icon">🕐</span><span>履歴</span></div>
-  <div class="s-item" onclick="doSearchWith('プレイリスト')"><span class="s-icon">📋</span><span>プレイリスト</span></div>
-  <div class="s-item" onclick="doSearchWith('後で見る')"><span class="s-icon">⏰</span><span>後で見る</span></div>
-  <div class="s-item" onclick="doSearchWith('評価した動画')"><span class="s-icon">👍</span><span>評価した動画</span></div>
+  <div class="s-item" onclick="searchWith('')"><span class="s-icon">🕐</span><span>履歴</span></div>
+  <div class="s-item" onclick="searchWith('プレイリスト')"><span class="s-icon">📋</span><span>プレイリスト</span></div>
+  <div class="s-item" onclick="searchWith('後で見る')"><span class="s-icon">⏰</span><span>後で見る</span></div>
+  <div class="s-item" onclick="searchWith('おすすめ')"><span class="s-icon">👍</span><span>評価した動画</span></div>
   <div class="s-divider"></div>
   <div class="s-label">おすすめ</div>
-  <div class="s-item" onclick="doSearchWith('トレンド')"><span class="s-icon">🔥</span><span>トレンド</span></div>
-  <div class="s-item" onclick="doSearchWith('音楽')"><span class="s-icon">🎵</span><span>音楽</span></div>
-  <div class="s-item" onclick="doSearchWith('ゲーム')"><span class="s-icon">🎮</span><span>ゲーム</span></div>
-  <div class="s-item" onclick="doSearchWith('ニュース')"><span class="s-icon">📰</span><span>ニュース</span></div>
-  <div class="s-item" onclick="doSearchWith('スポーツ')"><span class="s-icon">⚽</span><span>スポーツ</span></div>
+  <div class="s-item" onclick="searchWith('トレンド')"><span class="s-icon">🔥</span><span>トレンド</span></div>
+  <div class="s-item" onclick="searchWith('音楽')"><span class="s-icon">🎵</span><span>音楽</span></div>
+  <div class="s-item" onclick="searchWith('ゲーム')"><span class="s-icon">🎮</span><span>ゲーム</span></div>
+  <div class="s-item" onclick="searchWith('ニュース')"><span class="s-icon">📰</span><span>ニュース</span></div>
+  <div class="s-item" onclick="searchWith('スポーツ')"><span class="s-icon">⚽</span><span>スポーツ</span></div>
 </nav>
 
 <div id="main">
   <div id="home-page">
     <div id="chips">
-      <button class="chip active" onclick="setChip(this,'すべて')">すべて</button>
-      <button class="chip" onclick="setChip(this,'音楽')">音楽</button>
-      <button class="chip" onclick="setChip(this,'ゲーム')">ゲーム</button>
-      <button class="chip" onclick="setChip(this,'ライブ')">ライブ</button>
-      <button class="chip" onclick="setChip(this,'ニュース')">ニュース</button>
-      <button class="chip" onclick="setChip(this,'スポーツ')">スポーツ</button>
+      <button class="chip active" onclick="chipClick(this,'すべて')">すべて</button>
+      <button class="chip" onclick="chipClick(this,'音楽')">音楽</button>
+      <button class="chip" onclick="chipClick(this,'ゲーム')">ゲーム</button>
+      <button class="chip" onclick="chipClick(this,'ライブ')">ライブ</button>
+      <button class="chip" onclick="chipClick(this,'ニュース')">ニュース</button>
+      <button class="chip" onclick="chipClick(this,'スポーツ')">スポーツ</button>
     </div>
     <div id="video-grid"></div>
   </div>
@@ -185,49 +185,45 @@ let allVideos = [];
 let currentVideo = null;
 let likeCount = 0;
 
-// ── サフェティヘルパー ──
-function safe(str, fallback) {
-  return (typeof str === 'string' && str.length > 0) ? str : (fallback || '');
-}
-function firstChar(str) {
-  const s = safe(str, 'C');
-  return s.charAt(0).toUpperCase();
-}
 function esc(s) {
   const d = document.createElement('div');
-  d.textContent = s || '';
+  d.textContent = String(s || '');
   return d.innerHTML;
 }
-
-// ── NAV ──
-function goHome(){
-  document.getElementById('watch-page').classList.remove('active');
-  document.getElementById('home-page').style.display='';
-  const p=document.getElementById('watch-video');
-  p.pause(); p.src='';
-  renderGrid();
+function firstChar(s) {
+  const str = String(s || 'C');
+  return str.charAt(0).toUpperCase();
 }
 
-function toggleSidebar(){
+function goHome() {
+  document.getElementById('watch-page').classList.remove('active');
+  document.getElementById('home-page').style.display = '';
+  const p = document.getElementById('watch-video');
+  p.pause(); p.src = '';
+  if (allVideos.length) renderGrid();
+  else showEmpty();
+}
+
+function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('collapsed');
   document.getElementById('main').classList.toggle('full');
 }
 
-function setChip(el, label){
-  document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
+function chipClick(el, label) {
+  document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
   el.classList.add('active');
-  doSearchWith(label);
+  if (label === 'すべて') { goHome(); return; }
+  searchWith(label);
 }
 
-function doSearchWith(q){
+function searchWith(q) {
   document.getElementById('search-input').value = q;
   doSearch();
 }
 
-// ── SEARCH ──
-async function doSearch(){
+async function doSearch() {
   const q = document.getElementById('search-input').value.trim();
-  if(!q) return;
+  if (!q) { goHome(); return; }
 
   const grid = document.getElementById('video-grid');
   grid.innerHTML = '<div class="loading">検索中…</div>';
@@ -237,137 +233,131 @@ async function doSearch(){
   try {
     const r = await fetch('/api/search', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: q })
     });
     const d = await r.json();
     if (d.error) throw new Error(d.error);
     allVideos = d.videos || [];
     renderGrid();
-  } catch(e) {
-    grid.innerHTML = '<div class="empty"><span class="e-icon">⚠️</span><p>エラー: ' + esc(e.message) + '</p><p>サーバーログを確認してください</p></div>';
+  } catch (e) {
+    grid.innerHTML = '<div class="empty"><span class="e-icon">⚠️</span><p>エラー: ' + esc(e.message) + '</p></div>';
   }
 }
 
-// ── GRID ──
-function renderGrid(){
+function showEmpty() {
+  document.getElementById('video-grid').innerHTML =
+    '<div class="empty"><span class="e-icon">📭</span><p>動画がありません</p><p>検索バーからキーワードを入力してください</p></div>';
+}
+
+function renderGrid() {
   const grid = document.getElementById('video-grid');
-  if(!allVideos.length){
-    grid.innerHTML = '<div class="empty"><span class="e-icon">📭</span><p>動画がありません</p><p>検索バーからキーワードを入力してください</p></div>';
-    return;
-  }
-  grid.innerHTML = allVideos.map(v => {
-    const ch = safe(v.channel, 'C');
-    const thumb = safe(v.thumb, '');
-    return `<div class="vcard" onclick="openWatch('${v.id}')">
+  if (!allVideos.length) { showEmpty(); return; }
+  grid.innerHTML = allVideos.map(v => `
+    <div class="vcard" onclick="openWatch('${esc(v.id)}')">
       <div class="thumb">
-        <img src="${thumb}" loading="lazy" alt="" onerror="this.style.display='none'">
-        <span class="dur">${esc(v.duration||'')}</span>
+        <img src="${esc(v.thumb)}" loading="lazy" onerror="this.parentElement.style.background='#333'">
+        <span class="dur">${esc(v.duration)}</span>
       </div>
       <div class="v-meta">
-        <div class="v-avatar">${esc(firstChar(ch))}</div>
+        <div class="v-avatar">${esc(firstChar(v.channel))}</div>
         <div class="v-info">
           <div class="v-title">${esc(v.title)}</div>
-          <div class="v-ch">${esc(ch)}</div>
-          <div class="v-stats">${esc(v.views||'')}</div>
+          <div class="v-ch">${esc(v.channel)}</div>
+          <div class="v-stats">${esc(v.views)}</div>
         </div>
       </div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 }
 
-// ── WATCH ──
-async function openWatch(id){
+async function openWatch(id) {
   const p = document.getElementById('watch-video');
-  p.pause(); p.src='';
+  p.pause(); p.src = '';
   document.getElementById('home-page').style.display = 'none';
   document.getElementById('watch-page').classList.add('active');
   document.getElementById('watch-title').textContent = '読み込み中…';
   document.getElementById('up-next-list').innerHTML = '';
-  document.getElementById('watch-desc-body').textContent = '';
-  window.scrollTo(0,0);
+  document.getElementById('desc-stats').textContent = '';
+  document.getElementById('desc-body').textContent = '';
+  window.scrollTo(0, 0);
   likeCount = 0;
   document.getElementById('like-count').textContent = '0';
-  document.getElementById('watch-sub-btn').classList.remove('subbed');
-  document.getElementById('watch-sub-btn').textContent = '登録する';
+  const subBtn = document.getElementById('watch-sub-btn');
+  subBtn.classList.remove('subbed');
+  subBtn.textContent = '登録する';
 
   try {
     const r = await fetch('/api/video', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ videoId: id })
     });
     const info = await r.json();
-    if (info.error) throw new Error(info.error);
+    if (info.error) {
+      document.getElementById('watch-title').textContent = info.error + (info.title ? ' - ' + info.title : '');
+      return;
+    }
 
     currentVideo = info;
-    const author = safe(info.author, 'C');
-
-    document.getElementById('watch-title').textContent = safe(info.title, 'タイトル不明');
-    document.getElementById('watch-ch-avatar').textContent = firstChar(author);
-    document.getElementById('watch-ch-name').textContent = author;
+    document.getElementById('watch-title').textContent = info.title || 'タイトル不明';
+    document.getElementById('watch-ch-avatar').textContent = firstChar(info.author);
+    document.getElementById('watch-ch-name').textContent = info.author || 'チャンネル';
     document.getElementById('watch-ch-subs').textContent = '';
-    document.getElementById('desc-stats').textContent = safe(info.views, '') + ' 回視聴';
-    document.getElementById('desc-body').textContent = safe(info.description, '説明なし');
+    document.getElementById('desc-stats').textContent = info.views || '';
+    document.getElementById('desc-body').textContent = info.description || '';
 
     // Up Next
-    const related = info.related || [];
-    document.getElementById('up-next-list').innerHTML = related.map(o => {
-      const ch2 = safe(o.channel, 'C');
-      return `<div class="up-next" onclick="openWatch('${o.id}')">
-        <div class="un-thumb"><img src="${safe(o.thumb,'')}" loading="lazy" onerror="this.style.display='none'"><span class="dur">${esc(o.duration||'')}</span></div>
-        <div class="un-info"><div class="un-title">${esc(o.title)}</div><div class="un-ch">${esc(ch2)}</div><div class="un-stats">${esc(o.views||'')}</div></div>
-      </div>`;
-    }).join('');
+    const rel = info.related || [];
+    document.getElementById('up-next-list').innerHTML = rel.map(o => `
+      <div class="up-next" onclick="openWatch('${esc(o.id)}')">
+        <div class="un-thumb"><img src="${esc(o.thumb)}" loading="lazy" onerror="this.parentElement.style.background='#333'"><span class="dur">${esc(o.duration)}</span></div>
+        <div class="un-info"><div class="un-title">${esc(o.title)}</div><div class="un-ch">${esc(o.channel)}</div><div class="un-stats">${esc(o.views)}</div></div>
+      </div>`).join('');
 
     // 再生
     if (info.streamUrl) {
       p.src = '/proxy?url=' + encodeURIComponent(info.streamUrl);
-      p.play().catch(()=>{});
+      p.play().catch(() => {});
     } else {
-      document.getElementById('watch-title').textContent = safe(info.title,'') + '（ストリームURL未取得）';
+      document.getElementById('watch-title').textContent = (info.title || '') + '（ストリームURL未取得）';
     }
-  } catch(e) {
+  } catch (e) {
     document.getElementById('watch-title').textContent = 'エラー: ' + e.message;
   }
 }
 
-// ── ACTIONS ──
-function likeVideo(){
+function likeVideo() {
   likeCount++;
   document.getElementById('like-count').textContent = likeCount;
 }
 
-function toggleSub(){
+function toggleSub() {
   const b = document.getElementById('watch-sub-btn');
   b.classList.toggle('subbed');
   b.textContent = b.classList.contains('subbed') ? '登録済み' : '登録する';
 }
 
-function shareVideo(){
-  if(!currentVideo) return;
-  const text = currentVideo.title + ' - MyTube';
-  navigator.clipboard.writeText(text).then(()=>alert('コピーしました'));
+function shareVideo() {
+  if (!currentVideo) return;
+  navigator.clipboard.writeText(currentVideo.title || '').then(() => alert('タイトルをコピーしました'));
 }
 
-function downloadVideo(){
-  if(!currentVideo || !currentVideo.streamUrl) return alert('ダウンロードできません');
+function downloadVideo() {
+  if (!currentVideo || !currentVideo.streamUrl) return alert('ダウンロードできません');
   const a = document.createElement('a');
   a.href = '/proxy?url=' + encodeURIComponent(currentVideo.streamUrl);
   a.download = (currentVideo.title || 'video') + '.mp4';
   a.click();
 }
 
-// ── EVENTS ──
 document.getElementById('search-input').addEventListener('keydown', e => {
-  if(e.key === 'Enter') doSearch();
+  if (e.key === 'Enter') doSearch();
 });
 document.addEventListener('keydown', e => {
-  if(e.key === 'Escape' && document.getElementById('watch-page').classList.contains('active')) goHome();
+  if (e.key === 'Escape' && document.getElementById('watch-page').classList.contains('active')) goHome();
 });
 
-// ── INIT ──
-renderGrid();
+showEmpty();
 </script>
 </body>
 </html>   

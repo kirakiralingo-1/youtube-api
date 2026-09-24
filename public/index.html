@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MyTube</title>
+<title>Tube</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0f0f0f;--sf:#212121;--sf2:#121212;--bd:#3f3f3d;--tx:#f1f1f1;--sub:#aaa;--ac:#ff0000;--hov:#3d3d3d;--chip:#272727}
@@ -194,6 +194,12 @@ function firstChar(s) {
   const str = String(s || 'C');
   return str.charAt(0).toUpperCase();
 }
+function thumbUrl(v) {
+  // サムネイル: API返却 → フォールバック
+  if (v.thumb && v.thumb.length > 10) return v.thumb;
+  if (v.id) return 'https://i.ytimg.com/vi/' + v.id + '/hqdefault.jpg';
+  return '';
+}
 
 function goHome() {
   document.getElementById('watch-page').classList.remove('active');
@@ -241,7 +247,7 @@ async function doSearch() {
     allVideos = d.videos || [];
     renderGrid();
   } catch (e) {
-    grid.innerHTML = '<div class="empty"><span class="e-icon">⚠️</span><p>エラー: ' + esc(e.message) + '</p></div>';
+    grid.innerHTML = '<div class="empty"><span class="e-icon">⚠️</span><p>検索エラー: ' + esc(e.message) + '</p></div>';
   }
 }
 
@@ -253,10 +259,11 @@ function showEmpty() {
 function renderGrid() {
   const grid = document.getElementById('video-grid');
   if (!allVideos.length) { showEmpty(); return; }
-  grid.innerHTML = allVideos.map(v => `
-    <div class="vcard" onclick="openWatch('${esc(v.id)}')">
+  grid.innerHTML = allVideos.map(v => {
+    const t = thumbUrl(v);
+    return `<div class="vcard" onclick="openWatch('${esc(v.id)}')">
       <div class="thumb">
-        <img src="${esc(v.thumb)}" loading="lazy" onerror="this.parentElement.style.background='#333'">
+        ${t ? '<img src="' + esc(t) + '" loading="lazy" onerror="this.style.display=\'none\'">' : ''}
         <span class="dur">${esc(v.duration)}</span>
       </div>
       <div class="v-meta">
@@ -267,7 +274,8 @@ function renderGrid() {
           <div class="v-stats">${esc(v.views)}</div>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 async function openWatch(id) {
@@ -293,8 +301,12 @@ async function openWatch(id) {
       body: JSON.stringify({ videoId: id })
     });
     const info = await r.json();
+
     if (info.error) {
-      document.getElementById('watch-title').textContent = info.error + (info.title ? ' - ' + info.title : '');
+      document.getElementById('watch-title').textContent = '⚠️ ' + info.error;
+      if (info.detail) {
+        document.getElementById('desc-body').textContent = '詳細: ' + info.detail;
+      }
       return;
     }
 
@@ -308,16 +320,21 @@ async function openWatch(id) {
 
     // Up Next
     const rel = info.related || [];
-    document.getElementById('up-next-list').innerHTML = rel.map(o => `
-      <div class="up-next" onclick="openWatch('${esc(o.id)}')">
-        <div class="un-thumb"><img src="${esc(o.thumb)}" loading="lazy" onerror="this.parentElement.style.background='#333'"><span class="dur">${esc(o.duration)}</span></div>
+    document.getElementById('up-next-list').innerHTML = rel.map(o => {
+      const t = thumbUrl(o);
+      return `<div class="up-next" onclick="openWatch('${esc(o.id)}')">
+        <div class="un-thumb">${t ? '<img src="' + esc(t) + '" loading="lazy" onerror="this.style.display=\'none\'">' : ''}<span class="dur">${esc(o.duration)}</span></div>
         <div class="un-info"><div class="un-title">${esc(o.title)}</div><div class="un-ch">${esc(o.channel)}</div><div class="un-stats">${esc(o.views)}</div></div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
     // 再生
     if (info.streamUrl) {
       p.src = '/proxy?url=' + encodeURIComponent(info.streamUrl);
-      p.play().catch(() => {});
+      p.play().catch(e => {
+        console.error('Play error:', e);
+        document.getElementById('watch-title').textContent = (info.title || '') + '（再生エラー: ' + e.message + '）';
+      });
     } else {
       document.getElementById('watch-title').textContent = (info.title || '') + '（ストリームURL未取得）';
     }
@@ -339,7 +356,7 @@ function toggleSub() {
 
 function shareVideo() {
   if (!currentVideo) return;
-  navigator.clipboard.writeText(currentVideo.title || '').then(() => alert('タイトルをコピーしました'));
+  navigator.clipboard.writeText(currentVideo.title || '').then(() => alert('コピーしました'));
 }
 
 function downloadVideo() {
@@ -358,6 +375,6 @@ document.addEventListener('keydown', e => {
 });
 
 showEmpty();
-</script>
+</script>   
 </body>
 </html>   

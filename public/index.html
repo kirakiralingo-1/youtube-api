@@ -6,11 +6,10 @@
 <title>MyTube</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0f0f0f;--sf:#212121;--sf2:#121212;--bd:#3f3f3f;--tx:#f1f1f1;--sub:#aaa;--ac:#ff0000;--hov:#3d3d3d;--chip:#272727}
+:root{--bg:#0f0f0f;--sf:#212121;--sf2:#121212;--bd:#3f3f3d;--tx:#f1f1f1;--sub:#aaa;--ac:#ff0000;--hov:#3d3d3d;--chip:#272727}
 body{font-family:Roboto,-apple-system,'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--tx);overflow-x:hidden}
 button{font-family:inherit;cursor:pointer}
 
-/* HEADER */
 #header{position:fixed;top:0;left:0;right:0;height:56px;background:var(--bg);display:flex;align-items:center;padding:0 16px;z-index:1000;gap:8px}
 .h-left{display:flex;align-items:center;gap:8px;min-width:180px}
 .h-center{flex:1;display:flex;justify-content:center;max-width:728px;margin:0 24px}
@@ -27,7 +26,6 @@ button{font-family:inherit;cursor:pointer}
 .search-form .s-btn:hover{background:var(--hov)}
 .avatar{width:32px;height:32px;border-radius:50%;background:#7c4dff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;color:#fff}
 
-/* SIDEBAR */
 #sidebar{position:fixed;top:56px;left:0;bottom:0;width:240px;background:var(--bg);overflow-y:auto;padding:12px 0;z-index:900;transition:transform .2s}
 #sidebar.collapsed{width:72px}
 #sidebar.collapsed .s-item span{display:none}
@@ -40,18 +38,15 @@ button{font-family:inherit;cursor:pointer}
 .s-divider{height:1px;background:var(--bd);margin:12px 0}
 .s-label{padding:8px 24px;font-size:13px;font-weight:500;color:var(--sub)}
 
-/* MAIN */
 #main{margin-top:56px;margin-left:240px;transition:margin-left .2s}
 #main.full{margin-left:72px}
 
-/* CHIPS */
 #chips{display:flex;gap:12px;padding:12px 24px;overflow-x:auto;position:sticky;top:56px;background:var(--bg);z-index:100}
 #chips::-webkit-scrollbar{display:none}
 .chip{padding:8px 12px;border-radius:8px;background:var(--chip);color:var(--tx);font-size:14px;white-space:nowrap;cursor:pointer;border:none;transition:background .15s}
 .chip:hover{background:var(--hov)}
 .chip.active{background:var(--tx);color:var(--bg)}
 
-/* GRID */
 #video-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;padding:8px 24px 24px}
 .vcard{cursor:pointer}
 .vcard .thumb{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#333}
@@ -64,7 +59,6 @@ button{font-family:inherit;cursor:pointer}
 .vcard .v-ch{font-size:13px;color:var(--sub);margin-bottom:2px}
 .vcard .v-stats{font-size:13px;color:var(--sub)}
 
-/* WATCH */
 #watch-page{display:none;padding:24px;max-width:1754px;margin:0 auto}
 #watch-page.active{display:block}
 #watch-layout{display:flex;gap:24px}
@@ -86,7 +80,6 @@ button{font-family:inherit;cursor:pointer}
 #watch-desc .desc-stats{font-weight:500;margin-bottom:4px}
 #watch-desc .desc-body{color:var(--sub)}
 
-/* UP NEXT */
 #watch-secondary{width:402px;flex-shrink:0}
 .up-next{border-radius:12px;overflow:hidden;cursor:pointer;display:flex;gap:8px;margin-bottom:8px}
 .up-next:hover .un-title{color:#fff}
@@ -98,7 +91,6 @@ button{font-family:inherit;cursor:pointer}
 .up-next .un-ch{font-size:12px;color:var(--sub);margin-top:4px}
 .up-next .un-stats{font-size:12px;color:var(--sub)}
 
-/* EMPTY / LOADING */
 .empty,.loading{grid-column:1/-1;text-align:center;padding:80px 20px;color:var(--sub)}
 .empty .e-icon{font-size:64px;display:block;margin-bottom:16px}
 .empty p{font-size:16px;margin-bottom:8px}
@@ -192,7 +184,6 @@ button{font-family:inherit;cursor:pointer}
 let allVideos = [];
 let currentVideo = null;
 
-// ── NAV ──
 function goHome(){
   document.getElementById('watch-page').classList.remove('active');
   document.getElementById('home-page').style.display='';
@@ -203,6 +194,7 @@ function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('collapsed');
   document.getElementById('main').classList.toggle('full');
 }
+
 async function doSearch(){
   const q=document.getElementById('search-input').value.trim();
   if(!q)return;
@@ -213,34 +205,14 @@ async function doSearch(){
   try{
     const r=await fetch('/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
     const d=await r.json();
-    allVideos=extractSearchResults(d);
+    if(d.error)throw new Error(d.error);
+    allVideos=d.videos||[];
     renderGrid();
-  }catch(e){grid.innerHTML='<div class="empty"><span class="e-icon">⚠️</span><p>エラー: '+e.message+'</p></div>'}
+  }catch(e){
+    grid.innerHTML='<div class="empty"><span class="e-icon">⚠️</span><p>エラー: '+esc(e.message)+'</p></div>';
+  }
 }
 
-// ── SEARCH RESULT PARSER ──
-function extractSearchResults(data){
-  const vids=[];
-  const walk=(obj)=>{
-    if(!obj||typeof obj!=='object')return;
-    if(obj.videoRenderer){
-      const v=obj.videoRenderer;
-      vids.push({
-        id:v.videoId,
-        title:v.title?.runs?.[0]?.text||'',
-        channel:v.ownerText?.runs?.[0]?.text||'',
-        views:v.viewCountText?.simpleText||v.viewCountText?.runs?.[0]?.text||'',
-        dur:v.lengthText?.simpleText||'',
-        thumb:v.thumbnail?.thumbnails?.at(-1)?.url||''
-      });
-    }
-    for(const k in obj) walk(obj[k]);
-  };
-  walk(data);
-  return vids;
-}
-
-// ── GRID ──
 function renderGrid(){
   const grid=document.getElementById('video-grid');
   if(!allVideos.length){
@@ -251,20 +223,19 @@ function renderGrid(){
     <div class="vcard" onclick="openWatch('${v.id}')">
       <div class="thumb">
         <img src="${v.thumb}" loading="lazy" alt="">
-        <span class="dur">${v.dur||''}</span>
+        <span class="dur">${v.duration||''}</span>
       </div>
       <div class="v-meta">
         <div class="v-avatar">${(v.channel||'C')[0].toUpperCase()}</div>
         <div class="v-info">
           <div class="v-title">${esc(v.title)}</div>
           <div class="v-ch">${esc(v.channel)}</div>
-          <div class="v-stats">${v.views}</div>
+          <div class="v-stats">${v.views||''}</div>
         </div>
       </div>
     </div>`).join('');
 }
 
-// ── WATCH ──
 async function openWatch(id){
   const p=document.getElementById('watch-video');
   p.pause();p.src='';
@@ -275,74 +246,52 @@ async function openWatch(id){
   window.scrollTo(0,0);
 
   try{
-    const r=await fetch('/api/player',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoId:id})});
-    const d=await r.json();
-    if(d.playabilityStatus?.status!=='OK'){
-      document.getElementById('watch-title').textContent='再生できません: '+(d.playabilityStatus?.reason||'不明');
-      return;
-    }
-    const vd=d.videoDetails;
-    currentVideo={id,title:vd.title,channel:vd.author,views:vd.viewCount,desc:vd.shortDescription};
+    // 動画情報取得
+    const r1=await fetch('/api/video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoId:id})});
+    const info=await r1.json();
+    if(info.error)throw new Error(info.error);
 
-    // Best stream URL を取得
-    const formats=d.streamingData?.formats||[];
-    const adaptive=d.streamingData?.adaptiveFormats||[];
-    // 統合ストリーム（動画+音声）を優先
-    let best=formats.find(f=>f.itag===22)||formats.find(f=>f.itag===18)||formats[0];
-    if(!best){
-      // adaptive: video 18 (mp4) + audio 251 (m4a) を使う場合は複雑なので、統合のみ
-      best=adaptive.find(f=>f.itag===18)||adaptive[0];
-    }
-    if(!best?.url){
-      document.getElementById('watch-title').textContent='ストリームURLを取得できません';
-      return;
-    }
-
-    // サムネイル
-    const thumb=d.videoDetails?.thumbnail?.thumbnails?.at(-1)?.url||'';
-
-    // 表示
-    document.getElementById('watch-title').textContent=vd.title;
-    document.getElementById('watch-ch-avatar').textContent=(vd.author||'C')[0].toUpperCase();
-    document.getElementById('watch-ch-name').textContent=vd.author;
-    document.getElementById('watch-ch-subs').textContent='登録者数不明';
+    currentVideo=info;
+    document.getElementById('watch-title').textContent=info.title;
+    document.getElementById('watch-ch-avatar').textContent=(info.author||'C')[0].toUpperCase();
+    document.getElementById('watch-ch-name').textContent=info.author;
+    document.getElementById('watch-ch-subs').textContent='';
     document.getElementById('like-count').textContent='0';
-    document.getElementById('desc-stats').textContent=`${fmtNum(vd.viewCount)} 回視聴`;
-    document.getElementById('desc-body').textContent=vd.shortDescription||'';
+    document.getElementById('desc-stats').textContent=info.views||'';
+    document.getElementById('desc-body').textContent=info.description||'';
 
-    // 再生（プロキシ経由）
-    const proxyUrl='/proxy?url='+encodeURIComponent(best.url);
-    p.src=proxyUrl;
-    p.play();
-
-    // Up Next（同じ検索結果から）
-    const others=allVideos.filter(v=>v.id!==id).slice(0,12);
-    document.getElementById('up-next-list').innerHTML=others.map(o=>`
+    // Up Next
+    const related=info.related||[];
+    document.getElementById('up-next-list').innerHTML=related.map(o=>`
       <div class="up-next" onclick="openWatch('${o.id}')">
-        <div class="un-thumb"><img src="${o.thumb}" loading="lazy"><span class="dur">${o.dur||''}</span></div>
-        <div class="un-info"><div class="un-title">${esc(o.title)}</div><div class="un-ch">${esc(o.channel)}</div><div class="un-stats">${o.views}</div></div>
+        <div class="un-thumb"><img src="${o.thumb}" loading="lazy"><span class="dur">${o.duration||''}</span></div>
+        <div class="un-info"><div class="un-title">${esc(o.title)}</div><div class="un-ch">${esc(o.channel)}</div><div class="un-stats">${o.views||''}</div></div>
       </div>`).join('');
+
+    // ストリームURL取得 → 再生
+    const r2=await fetch('/api/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videoId:id})});
+    const sd=await r2.json();
+    if(sd.error)throw new Error(sd.error);
+
+    p.src='/proxy?url='+encodeURIComponent(sd.url);
+    p.play();
   }catch(e){
     document.getElementById('watch-title').textContent='エラー: '+e.message;
   }
 }
 
-// ── ACTIONS ──
 function likeVideo(){
   const el=document.getElementById('like-count');
   el.textContent=(parseInt(el.textContent)||0)+1;
 }
 
-// ── UTILS ──
 function fmtNum(n){if(!n)return'';n=parseInt(n);if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'K';return n}
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML}
 
-// ── EVENTS ──
 document.getElementById('search-input').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('watch-page').classList.contains('active'))goHome()});
 document.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>{document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));c.classList.add('active')}));
 
-// ── INIT ──
 renderGrid();
 </script>
 </body>

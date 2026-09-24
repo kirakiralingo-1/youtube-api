@@ -1,7 +1,11 @@
 {
-  "name": "tubelocal",
-  "version": "2.0.0",
+  "name": "mytube",
+  "version": "1.0.0",
   "main": "server.js",
-  "scripts": { "start": "node server.js" },
-  "dependencies": { "youtubei.js": "^10.1.0" }
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0"
+  }
 }   

@@ -11,14 +11,15 @@ const HEADERS = {
   'Cookie': 'CONSENT=YES+cb.20210328-17-p0.en+FX+417; SOCS=CAI',
 };
 
-// ytInitialData をHTMLから抽出
-function extractYtData(html) {
-  const m = html.match(/var ytInitialData\s*=\s*(\{.+?\});\s*(?:var |<\/script>)/s);
+// ===== HTMLからJSON抽出 =====
+function extractJson(html, varName) {
+  const re = new RegExp(`var ${varName}\\s*=\\s*(\\{.+?\\});\\s*(?:var |</script>)`, 's');
+  const m = html.match(re);
   if (!m) return null;
   try { return JSON.parse(m[1]); } catch { return null; }
 }
 
-// 複数のレンダラ形式から動画を抽出
+// ===== 動画リスト抽出（サムネは固定URLパターン） =====
 function collectVideos(data) {
   const videos = [];
   const seen = new Set();
@@ -34,14 +35,13 @@ function collectVideos(data) {
         videos.push({
           id,
           title: v.title?.runs?.map(r => r.text).join('') || v.title?.simpleText || '',
-          channel: v.ownerText?.runs?.map(r => r.text).join('') || v.longBylineText?.runs?.map(r => r.text).join('') || '',
-          thumbnail: v.thumbnail?.thumbnails?.slice(-1)[0]?.url || '',
-          views: v.viewCountText?.simpleText || v.shortViewCountText?.simpleText || '',
+          channel: v.ownerText?.runs?.map(r => r.text).join('') || '',
+          thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+          views: v.viewCountText?.simpleText || '',
           published: v.publishedTimeText?.simpleText || '',
           duration: v.lengthText?.simpleText || '',
         });
       }
-      // lockupViewModel (新形式)
       if (key === 'lockupViewModel' && val.contentId) {
         const id = val.contentId;
         if (seen.has(id)) continue;
@@ -51,8 +51,11 @@ function collectVideos(data) {
         const rows = meta?.metadata?.contentMetadataViewModel?.metadataRows || [];
         const channel = rows[0]?.metadataParts?.[0]?.text?.content || '';
         const views = rows[1]?.metadataParts?.[0]?.text?.content || '';
-        const thumb = val.thumbnail?.thumbnailViewModel?.thumbnail?.thumbnails?.slice(-1)[0]?.sourceUrl || '';
-        videos.push({ id, title, channel, thumbnail: thumb, views, published: '', duration: '' });
+        videos.push({
+          id, title, channel,
+          thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+          views, published: '', duration: '',
+        });
       }
       if (val && typeof val === 'object') walk(val);
     }
@@ -61,32 +64,70 @@ function collectVideos(data) {
   return videos;
 }
 
-// 共通fetch
-async function fetchYt(url) {
+async function fetchYtPage(url) {
   const r = await fetch(url, { headers: HEADERS });
   const html = await r.text();
-  const data = extractYtData(html);
-  if (!data) throw new Error('parse failed');
-  return collectVideos(data);
+  return html;
 }
 
-// トレンド代替：今週・再生数順
+// ===== トレンド（今週・再生数順） =====
 app.get('/api/trending', async (req, res) => {
   try {
-    const url = 'https://www.youtube.com/results?search_query=&sp=CAMSAhAB';
-    res.json(await fetchYt(url));
+    const html = await fetchYtPage('https://www.youtube.com/results?search_query=&sp=CAMSAhAB');
+    const data = extractJson(html, 'ytInitialData');
+    if (!data) return res.status(500).json({ error: 'parse failed' });
+    res.json(collectVideos(data));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// 検索
+// ===== 検索 =====
 app.get('/api/search', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.json([]);
   try {
-    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
-    res.json(await fetchYt(url));
+    const html = await fetchYtPage(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`);
+    const data = extractJson(html, 'ytInitialData');
+    if (!data) return res.status(500).json({ error: 'parse failed' });
+    res.json(collectVideos(data));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===== ストリームURL取得（googlevideo.com） =====
+app.get('/api/stream/:videoId', async (req, res) => {
+  const { videoId } = req.params;
+  try {
+    const html = await fetchYtPage(`https://www.youtube.com/watch?v=${videoId}`);
+    const player = extractJson(html, 'ytInitialPlayerResponse');
+    if (!player) return res.status(500).json({ error: 'player response not found' });
+
+    const formats = player.streamingData?.formats || [];
+    const adaptive = player.streamingData?.adaptiveFormats || [];
+
+    // プログレッシブ（音+画が1つのMP4）を優先: itag 22(720p) > 18(360p)
+    let best = formats.find(f => f.itag === 22 && f.url)
+      || formats.find(f => f.itag === 18 && f.url)
+      || formats.find(f => f.url && f.mimeType?.includes('mp4'));
+
+    // なければadaptiveから画+音の組み合わせ（DASHはブラウザのMSEで再生）
+    if (!best) {
+      const video = adaptive.find(f => f.itag === 137 && f.url) || adaptive.find(f => f.itag === 136 && f.url);
+      const audio = adaptive.find(f => f.itag === 140 && f.url);
+      if (video && audio) {
+        return res.json({ type: 'dash', video: video.url, audio: audio.url, title: player.videoDetails?.title || '' });
+      }
+      return res.status(404).json({ error: 'no stream found' });
+    }
+
+    res.json({
+      type: 'progressive',
+      url: best.url,
+      title: player.videoDetails?.title || '',
+      quality: best.qualityLabel || best.quality || '',
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

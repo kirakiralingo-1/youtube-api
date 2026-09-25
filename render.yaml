@@ -6,6 +6,6 @@ services:
     dockerfilePath: Dockerfile
     envVars:
       - key: API_URL
-        value: https://yt-stream.onrender.com
+        value: https://yt-stream-5v2o.onrender.com
       - key: YOUTUBE_SESSION_SERVER
         value: http://127.0.0.1:4416/token   

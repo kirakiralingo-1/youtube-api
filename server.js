@@ -1,150 +1,145 @@
 const express = require('express');
 const path = require('path');
-const { Innertube } = require('youtubei.js');
-
 const app = express();
-const PORT = process.env.PORT || 3000;
-app.use(express.static(path.join(__dirname, 'public')));
 
-// Innertubeインスタンス（初回アクセス時に生成）
-let yt = null;
-async function getYt() {
-  if (!yt) yt = await Innertube.create();
-  return yt;
-}
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
+const INNERTUBE_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
 
-// ===== 動画リストをフロントエンド用形式に変換 =====
-function formatVideos(videos) {
-  return videos.map(v => ({
-    id: v.id,
-    title: v.title || '',
-    channel: v.author || v.channel?.name || '',
-    thumbnail: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`,
-    views: v.views || v.metadata?.short_view_count_text?.simple_text || v.metadata?.view_count || '',
-    published: v.published || v.metadata?.published || '',
-    duration: v.duration?.simple_text || (typeof v.duration === 'string' ? v.duration : ''),
-  }));
-}
+app.use(express.static(path.join(__dirname)));
 
-// ===== 人気（今週・再生数順） =====
-// FEtrendingは廃止済み → 検索APIで代替
+// === トレンド（HTMLスクレイプ） ===
 app.get('/api/trending', async (req, res) => {
   try {
-    const y = await getYt();
-    // sp=CAMSAhAB = 今週 + 再生数順
-    const data = await y.actions.execute('/search', {
-      query: '',
-      params: 'CAMSAhAB',
-      parse: true
-    });
-    const videos = data?.contents?.twoColumnSearchResultsRenderer
-      ?.primaryContents?.sectionListRenderer?.contents
-      ?.flatMap(s => s.itemSectionRenderer?.contents || [])
-      ?.map(item => item.videoRenderer || item.lockupViewModel)
-      ?.filter(Boolean) || [];
+    const html = await fetch('https://www.youtube.com/feed/trending?gl=JP&hl=ja', {
+      headers: { 'User-Agent': UA, 'Accept-Language': 'ja' }
+    }).then(r => r.text());
 
-    // videoRenderer形式
-    const result = videos
-      .filter(v => v.videoId || v.contentId)
-      .map(v => {
-        if (v.videoId) {
-          return {
-            id: v.videoId,
-            title: v.title?.runs?.map(r => r.text).join('') || '',
-            channel: v.ownerText?.runs?.map(r => r.text).join('') || '',
-            thumbnail: `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`,
-            views: v.viewCountText?.simpleText || '',
-            published: v.publishedTimeText?.simpleText || '',
-            duration: v.lengthText?.simpleText || '',
-          };
-        }
-        // lockupViewModel形式
-        const id = v.contentId;
-        const meta = v.metadata?.lockupMetadataViewModel;
-        const title = meta?.title?.content || '';
-        const rows = meta?.metadata?.contentMetadataViewModel?.metadataRows || [];
-        return {
-          id, title,
-          channel: rows[0]?.metadataParts?.[0]?.text?.content || '',
-          thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
-          views: rows[1]?.metadataParts?.[0]?.text?.content || '',
-          published: '', duration: '',
-        };
-      });
+    const m = html.match(/var ytInitialData = (\{.+?\});<\/script>/s);
+    if (!m) return res.json({ items: [] });
 
-    res.json(result);
+    const data = JSON.parse(m[1]);
+    const items = [];
+
+    const walk = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      if (obj.videoRenderer) {
+        const v = obj.videoRenderer;
+        items.push({
+          id: v.videoId,
+          title: v.title?.runs?.[0]?.text || '',
+          channel: v.ownerText?.runs?.[0]?.text || v.longBylineText?.runs?.[0]?.text || '',
+          thumbnail: v.thumbnail?.thumbnails?.at(-1)?.url || `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`,
+          views: v.viewCountText?.simpleText || v.viewCountText?.runs?.[0]?.text || '',
+          duration: v.lengthText?.simpleText || ''
+        });
+      }
+      if (obj.richItemRenderer) {
+        const c = obj.richItemRenderer.content;
+        if (c?.videoRenderer) walk(c);
+      }
+      for (const val of Object.values(obj)) walk(val);
+    };
+    walk(data);
+
+    res.json({ items: items.slice(0, 50) });
   } catch (e) {
-    console.error('Trending error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// ===== 検索 =====
+// === 検索（InnerTube、キー不要） ===
 app.get('/api/search', async (req, res) => {
-  const q = (req.query.q || '').trim();
-  if (!q) return res.json([]);
+  const q = req.query.q || '';
   try {
-    const y = await getYt();
-    const results = await y.search(q);
-    res.json(formatVideos(results.videos || []));
+    const r = await fetch(`https://www.youtube.com/youtubei/v1/search?key=${INNERTUBE_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': UA },
+      body: JSON.stringify({
+        context: { client: { clientName: 'WEB', clientVersion: '2.20250101.00.00', hl: 'ja', gl: 'JP' } },
+        query: q
+      })
+    });
+    const d = await r.json();
+    const items = [];
+
+    const walk = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      if (obj.videoRenderer) {
+        const v = obj.videoRenderer;
+        items.push({
+          id: v.videoId,
+          title: v.title?.runs?.[0]?.text || '',
+          channel: v.ownerText?.runs?.[0]?.text || '',
+          thumbnail: v.thumbnail?.thumbnails?.at(-1)?.url || `https://i.ytimg.com/vi/${v.videoId}/mqdefault.jpg`,
+          views: v.viewCountText?.simpleText || '',
+          duration: v.lengthText?.simpleText || ''
+        });
+      }
+      for (const val of Object.values(obj)) walk(val);
+    };
+    walk(d);
+
+    res.json({ items: items.slice(0, 50) });
   } catch (e) {
-    console.error('Search error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// ===== ストリームURL取得 =====
+// === ストリームURL取得（ANDROIDクライアント、キー不要） ===
 app.get('/api/stream/:videoId', async (req, res) => {
   const { videoId } = req.params;
   try {
-    const y = await getYt();
-    const info = await y.getBasicInfo(videoId);
+    const r = await fetch(`https://www.youtube.com/youtubei/v1/player?key=${INNERTUBE_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        context: { client: { clientName: 'ANDROID', clientVersion: '20.10.38', androidSdkVersion: 30, hl: 'ja' } },
+        videoId
+      })
+    });
+    const d = await r.json();
 
-    if (info.playability_status?.status !== 'OK') {
-      return res.status(403).json({ error: `playability: ${info.playability_status?.status}` });
+    // 進捗形式（MP4直接URL）を優先
+    const formats = d.streamingData?.formats || [];
+    const adaptive = d.streamingData?.adaptiveFormats || [];
+
+    // 解像度順にソート（高い順）
+    const all = [
+      ...formats.filter(f => f.url).map(f => ({ ...f, type: 'progressive' })),
+      ...adaptive.filter(f => f.url).map(f => ({ ...f, type: 'adaptive' }))
+    ].sort((a, b) => (b.height || 0) - (a.height || 0));
+
+    // 最も解像度が高い「動画+音声」のprogressive形式、なければ最高画質のadaptive
+    let best = all.find(f => f.type === 'progressive' && f.mimeType?.includes('video'));
+    if (!best) best = all.find(f => f.mimeType?.includes('video/'));
+
+    // 音声URL（adaptiveのみの場合）
+    let audioUrl = null;
+    if (best?.type === 'adaptive') {
+      const audio = adaptive.find(f => f.mimeType?.includes('audio') && f.url);
+      if (audio) audioUrl = audio.url;
     }
 
-    const formats = info.streaming_data?.formats || [];
-    const adaptive = info.streaming_data?.adaptive_formats || [];
-
-    // プログレッシブ（音+画1ファイル）: itag 22(720p) > 18(360p)
-    let best = formats.find(f => f.itag === 22)
-      || formats.find(f => f.itag === 18)
-      || formats.find(f => f.mimeType?.includes('mp4'));
-
-    if (best) {
-      const url = best.decipher(y.session.player);
-      return res.json({
-        type: 'progressive',
-        url,
-        title: info.basic_info?.title || '',
-        quality: best.quality_label || best.quality || '',
-      });
-    }
-
-    // DASH: 画(137=1080p / 136=720p) + 音(140=m4a)
-    const video = adaptive.find(f => f.itag === 137)
-      || adaptive.find(f => f.itag === 136)
-      || adaptive.find(f => f.type?.includes('video') && !f.type?.includes('audio'));
-    const audio = adaptive.find(f => f.itag === 140)
-      || adaptive.find(f => f.type?.includes('audio'));
-
-    if (video && audio) {
-      const videoUrl = video.decipher(y.session.player);
-      const audioUrl = audio.decipher(y.session.player);
-      return res.json({
-        type: 'dash',
-        video: videoUrl,
-        audio: audioUrl,
-        title: info.basic_info?.title || '',
-      });
-    }
-
-    res.status(404).json({ error: 'no stream found' });
+    res.json({
+      title: d.videoDetails?.title || '',
+      channel: d.videoDetails?.author || '',
+      url: best?.url || null,
+      audioUrl,
+      mimeType: best?.mimeType || '',
+      height: best?.height || 0,
+      // 全形式（品質切り替え用）
+      formats: all.filter(f => f.url).map(f => ({
+        itag: f.itag,
+        url: f.url,
+        mimeType: f.mimeType,
+        height: f.height,
+        quality: f.qualityLabel || ''
+      }))
+    });
   } catch (e) {
-    console.error('Stream error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-app.listen(PORT, () => console.log(`Listening on ${PORT}`));   
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Running on :${PORT}`));   

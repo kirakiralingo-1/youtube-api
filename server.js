@@ -1,103 +1,58 @@
 import express from 'express';
 import path from 'path';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 
-const execFileAsync = promisify(execFile);
 const app = express();
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 app.use(express.static(__dirname));
+app.use(express.json());
 
-// ★ tvクライアント = PO Token不要・bot検知されにくい
-const YT_ARGS = [
-  '--extractor-args', 'youtube:player_client=tv,web_embedded',
-  '--no-warnings', '--no-playlist'
-];
-
-async function getFormats(videoId) {
-  const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const { stdout } = await execFileAsync('yt-dlp', [
-    ...YT_ARGS, '--dump-json', url
-  ], { timeout: 30000, maxBuffer: 10 * 1024 * 1024 });
-
-  const data = JSON.parse(stdout);
-  const formats = data.formats || [];
-
-  const progressive = formats
-    .filter(f => f.vcodec !== 'none' && f.acodec !== 'none' && f.url)
-    .sort((a, b) => (b.height || 0) - (a.height || 0));
-
-  const videoOnly = formats
-    .filter(f => f.vcodec !== 'none' && f.acodec === 'none' && f.url)
-    .sort((a, b) => (b.height || 0) - (a.height || 0))[0];
-
-  const audioOnly = formats
-    .filter(f => f.vcodec === 'none' && f.acodec !== 'none' && f.url)
-    .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
-
-  return {
-    title: data.title || '',
-    channel: data.channel || data.uploader || '',
-    directUrl: progressive[0]?.url || null,
-    directHeight: progressive[0]?.height || 0,
-    qualities: progressive.map(f => ({ url: f.url, height: f.height, quality: `${f.height}p` })),
-    dashVideo: videoOnly?.url || null,
-    dashAudio: audioOnly?.url || null
-  };
-}
-
-async function searchVideos(query) {
-  const { stdout } = await execFileAsync('yt-dlp', [
-    ...YT_ARGS, '--flat-playlist', '--dump-json',
-    `ytsearch20:${query}`
-  ], { timeout: 30000, maxBuffer: 10 * 1024 * 1024 });
-
-  const lines = stdout.trim().split('\n').filter(Boolean);
-  return lines.map(line => {
-    try {
-      const d = JSON.parse(line);
-      const id = d.id || d.video_id || '';
-      return {
-        id,
-        title: d.title || '',
-        channel: d.channel || d.uploader || '',
-        thumbnail: `https://img.youtube.com/vi/${id}/maxresdefault.jpg`,
-        views: '',
-        duration: d.duration_string || ''
-      };
-    } catch { return null; }
-  }).filter(Boolean);
-}
-
-app.get('/api/trending', async (req, res) => {
+// Cobalt API（ローカル :9000）を中継
+app.post('/api/cobalt', async (req, res) => {
   try {
-    const items = await searchVideos('人気 動画');
-    res.json({ items });
+    const r = await fetch('http://127.0.0.1:9000', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(req.body)
+    });
+    const d = await r.json();
+    res.json(d);
   } catch (e) {
-    console.error('[TRENDING]', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
+// 検索（Cobaltは検索非対応なのでInnerTubeで）
 app.get('/api/search', async (req, res) => {
   const q = req.query.q || '';
   if (!q) return res.json({ items: [] });
   try {
-    const items = await searchVideos(q);
-    res.json({ items });
+    const r = await fetch('https://www.youtube.com/youtubei/v1/search?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        context: { client: { clientName: 'WEB', clientVersion: '2.20250101.00.00', hl: 'ja', gl: 'JP' } },
+        query: q
+      })
+    });
+    const d = await r.json();
+    const items = [];
+    const walk = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      if (obj.videoRenderer?.videoId) {
+        const v = obj.videoRenderer;
+        items.push({
+          id: v.videoId,
+          title: v.title?.runs?.[0]?.text || '',
+          channel: v.ownerText?.runs?.[0]?.text || '',
+          thumbnail: `https://img.youtube.com/vi/${v.videoId}/maxresdefault.jpg`,
+          duration: v.lengthText?.simpleText || ''
+        });
+      }
+      for (const val of Object.values(obj)) if (typeof val === 'object') walk(val);
+    };
+    walk(d);
+    res.json({ items: items.slice(0, 50) });
   } catch (e) {
-    console.error('[SEARCH]', e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.get('/api/stream/:videoId', async (req, res) => {
-  const { videoId } = req.params;
-  try {
-    const data = await getFormats(videoId);
-    res.json(data);
-  } catch (e) {
-    console.error('[STREAM]', e.message);
     res.status(500).json({ error: e.message });
   }
 });

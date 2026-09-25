@@ -1,29 +1,3 @@
-let player = null;
-
-/* ===== YouTube IFrame API ===== */
-function onYouTubeIframeAPIReady() {}
-
-function playVideo(id, title) {
-  const overlay = document.getElementById('overlay');
-  overlay.classList.remove('hidden');
-  document.getElementById('playerTitle').textContent = title;
-
-  if (player) { player.destroy(); player = null; }
-  player = new YT.Player('player', {
-    videoId: id,
-    playerVars: { autoplay: 1, rel: 0 },
-    events: { onReady: e => e.target.playVideo() }
-  });
-}
-
-function closePlayer() {
-  document.getElementById('overlay').classList.add('hidden');
-  if (player) { player.stopVideo(); player.destroy(); player = null; }
-}
-
-document.getElementById('closeBtn').onclick = closePlayer;
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closePlayer(); });
-
 /* ===== 描画 ===== */
 function render(videos) {
   const grid = document.getElementById('grid');
@@ -47,8 +21,66 @@ function render(videos) {
 }
 
 function setLoading() {
-  document.getElementById('grid').innerHTML = '<p class="loading">読み込み中…</p>';
+  document.getElementById('grid').innerHTML = '<p class="loading-msg">読み込み中…</p>';
 }
+
+/* ===== 再生 ===== */
+const videoEl = document.getElementById('videoEl');
+const dashVideo = document.getElementById('dashVideo');
+const dashAudio = document.getElementById('dashAudio');
+const dashWrap = document.getElementById('dashWrap');
+const loadingEl = document.getElementById('loading');
+
+async function playVideo(id, title) {
+  const overlay = document.getElementById('overlay');
+  overlay.classList.remove('hidden');
+  document.getElementById('playerTitle').textContent = title;
+  loadingEl.style.display = 'flex';
+  videoEl.style.display = 'none';
+  dashWrap.style.display = 'none';
+
+  try {
+    const r = await fetch(`/api/stream/${id}`);
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'stream error');
+
+    loadingEl.style.display = 'none';
+
+    if (data.type === 'progressive') {
+      // 音+画が1つのMP4 → 直接 <video> で再生
+      videoEl.src = data.url;
+      videoEl.style.display = 'block';
+      videoEl.play();
+    } else if (data.type === 'dash') {
+      // DASH: 画と音を別々に同期再生
+      dashWrap.style.display = 'block';
+      dashVideo.src = data.video;
+      dashAudio.src = data.audio;
+      dashAudio.muted = false;
+      dashVideo.muted = true;
+      await Promise.all([
+        dashVideo.play().catch(() => {}),
+        dashAudio.play().catch(() => {}),
+      ]);
+      // 同期: 片方が止まったらもう片方も止める
+      dashVideo.onended = () => dashAudio.pause();
+      dashAudio.onended = () => dashVideo.pause();
+    }
+  } catch (e) {
+    loadingEl.textContent = `エラー: ${e.message}`;
+    loadingEl.style.display = 'flex';
+  }
+}
+
+function closePlayer() {
+  document.getElementById('overlay').classList.add('hidden');
+  videoEl.pause(); videoEl.src = '';
+  dashVideo.pause(); dashVideo.src = '';
+  dashAudio.pause(); dashAudio.src = '';
+}
+
+document.getElementById('closeBtn').onclick = closePlayer;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePlayer(); });
 
 /* ===== API ===== */
 async function loadTrending() {
@@ -76,7 +108,6 @@ async function doSearch() {
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
 }
-
 document.querySelectorAll('.tab').forEach(btn => {
   btn.onclick = () => {
     switchTab(btn.dataset.tab);
@@ -87,5 +118,4 @@ document.querySelectorAll('.tab').forEach(btn => {
 document.getElementById('searchBtn').onclick = doSearch;
 document.getElementById('q').onkeydown = e => { if (e.key === 'Enter') doSearch(); };
 
-/* ===== 初期表示 ===== */
 loadTrending();   

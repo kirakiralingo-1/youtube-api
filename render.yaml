@@ -4,4 +4,8 @@ services:
     runtime: docker
     plan: free
     dockerfilePath: Dockerfile
-    autoDeploy: true   
+    envVars:
+      - key: API_URL
+        value: https://yt-stream.onrender.com
+      - key: YOUTUBE_SESSION_SERVER
+        value: http://127.0.0.1:4416/token   

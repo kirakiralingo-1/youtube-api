@@ -1,15 +1,17 @@
 FROM node:22-slim
 
-# Python + yt-dlp + PO Token Provider 用プラグイン
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip curl && \
-    pip3 install --break-system-packages yt-dlp bgutil-ytdlp-pot-provider && \
+    python3 python3-pip git ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# PO Token Provider（HTTPサーバー、ポート4416）
-RUN git clone --single-branch --branch 2.0.0 \
-    https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git /opt/pot && \
-    cd /opt/pot/server && npm ci && npx tsc
+# yt-dlp（EJSスクリプト込み）+ POTプラグイン
+RUN pip3 install --break-system-packages "yt-dlp[default]" bgutil-ytdlp-pot-provider
+
+# POT Providerサーバー（リリースZIPから直接展開）
+RUN mkdir -p /opt/pot && cd /opt/pot && \
+    npm init -y && npm install express && \
+    git clone --depth 1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git src && \
+    cd src/server && npm install && npx tsc
 
 WORKDIR /app
 COPY package.json ./
@@ -19,4 +21,4 @@ COPY . .
 ENV YTDLP_POT_PROVIDER_URL=http://127.0.0.1:4416
 
 EXPOSE 3000
-CMD ["sh", "-c", "node /opt/pot/server/build/main.js & sleep 5 && node server.js"]   
+CMD ["sh", "-c", "cd /opt/pot/src/server && node build/main.js & sleep 5 && node server.js"]   

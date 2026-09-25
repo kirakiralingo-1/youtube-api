@@ -1,142 +1,116 @@
 import express from 'express';
 import path from 'path';
-import { Innertube, Platform } from 'youtubei.js';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 
+const execFileAsync = promisify(execFile);
 const app = express();
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 app.use(express.static(__dirname));
 
-// 公式ドキュメント通りの設定
-Platform.shim.eval = async (data) => {
-  return new Function(data.output)();
-};
+// yt-dlp でストリームURLを取得
+async function getFormats(videoId) {
+  const url = `https://www.youtube.com/watch?v=${videoId}`;
+  const { stdout } = await execFileAsync('yt-dlp', [
+    '--extractor-args', 'youtube:player_client=mweb',
+    '--dump-json', '--no-warnings', '--no-playlist',
+    url
+  ], { timeout: 30000, maxBuffer: 10 * 1024 * 1024 });
 
-console.log('⏳ Innertube creating...');
-const yt = await Innertube.create({ retrieve_player: true });
-console.log('✅ Innertube ready');
+  const data = JSON.parse(stdout);
+  const formats = data.formats || [];
 
-// 安全な文字列化
-function txt(val) {
-  if (!val) return '';
-  if (typeof val === 'string') return val;
-  if (typeof val === 'number') return String(val);
-  if (val.text) return val.text;
-  if (val.runs) return val.runs.map(r => r.text || '').join('');
-  if (val.name) return val.name;
-  return String(val);
-}
+  // progressive（動画+音声一体）を収集
+  const progressive = formats
+    .filter(f => f.vcodec !== 'none' && f.acodec !== 'none' && f.url)
+    .sort((a, b) => (b.height || 0) - (a.height || 0));
 
-function mapVideo(v) {
-  const id = v.id || v.videoId || '';
+  // video-only 最高画質
+  const videoOnly = formats
+    .filter(f => f.vcodec !== 'none' && f.acodec === 'none' && f.url)
+    .sort((a, b) => (b.height || 0) - (a.height || 0))[0];
+
+  // audio-only 最高音質
+  const audioOnly = formats
+    .filter(f => f.vcodec === 'none' && f.acodec !== 'none' && f.url)
+    .sort((a, b) => (b.abr || 0) - (a.abr || 0))[0];
+
   return {
-    id,
-    title: txt(v.title),
-    channel: txt(v.author?.name || v.channel?.title || v.ownerText || v.author),
-    thumbnail: `https://img.youtube.com/vi/${id}/maxresdefault.jpg`,
-    views: txt(v.views),
-    duration: txt(v.duration)
+    title: data.title || '',
+    channel: data.channel || data.uploader || '',
+    duration: data.duration_string || '',
+    thumbnail: data.thumbnail || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+    // 直接再生用URL（progressive）
+    directUrl: progressive[0]?.url || null,
+    directHeight: progressive[0]?.height || 0,
+    // 全progressive品質
+    qualities: progressive.map(f => ({
+      url: f.url,
+      height: f.height,
+      quality: `${f.height}p`
+    })),
+    // DASH用（progressiveがない場合）
+    dashVideo: videoOnly?.url || null,
+    dashAudio: audioOnly?.url || null
   };
 }
 
-// === デバッグ ===
-app.get('/debug', async (req, res) => {
-  const videoId = req.query.id || 'dQw4w9WgXcQ';
-  const result = { videoId, steps: {} };
-  try {
-    const info = await yt.getInfo(videoId, { client: 'TV_EMBEDDED' });
-    result.steps['getInfo'] = `title: ${info.title}, formats: ${info.streaming_data?.formats?.length || 0}, adaptive: ${info.streaming_data?.adaptive_formats?.length || 0}`;
+// yt-dlp で検索
+async function searchVideos(query) {
+  const { stdout } = await execFileAsync('yt-dlp', [
+    '--extractor-args', 'youtube:player_client=mweb',
+    '--flat-playlist', '--dump-json', '--no-warnings',
+    `ytsearch20:${query}`
+  ], { timeout: 30000, maxBuffer: 10 * 1024 * 1024 });
 
-    const f = info.streaming_data?.adaptive_formats?.[0];
-    if (f) {
-      const url = await f.decipher(yt.session.player);
-      result.steps['decipher'] = url ? `OK: ${url.substring(0, 80)}...` : 'FAILED - empty';
-    } else {
-      result.steps['decipher'] = 'NO FORMATS';
-    }
+  const lines = stdout.trim().split('\n').filter(Boolean);
+  return lines.map(line => {
+    try {
+      const d = JSON.parse(line);
+      const id = d.id || d.video_id || '';
+      return {
+        id,
+        title: d.title || '',
+        channel: d.channel || d.uploader || '',
+        thumbnail: `https://img.youtube.com/vi/${id}/maxresdefault.jpg`,
+        views: '',
+        duration: d.duration_string || ''
+      };
+    } catch { return null; }
+  }).filter(Boolean);
+}
 
-    const manifest = await info.toDash(url => url);
-    result.steps['toDash'] = `OK - length: ${manifest.length}`;
-  } catch (e) {
-    result.error = e.message;
-  }
-  res.json(result);
-});
-
-// === トレンド ===
+// === API ===
 app.get('/api/trending', async (req, res) => {
   try {
-    const data = await yt.search('人気', { type: 'video' });
-    res.json({ items: (data.videos || []).slice(0, 50).map(mapVideo) });
+    const items = await searchVideos('人気 動画');
+    res.json({ items });
   } catch (e) {
+    console.error('[TRENDING]', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// === 検索 ===
 app.get('/api/search', async (req, res) => {
   const q = req.query.q || '';
   if (!q) return res.json({ items: [] });
   try {
-    const data = await yt.search(q, { type: 'video' });
-    res.json({ items: (data.videos || []).slice(0, 50).map(mapVideo) });
+    const items = await searchVideos(q);
+    res.json({ items });
   } catch (e) {
+    console.error('[SEARCH]', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// === DASHマニフェスト ===
-app.get('/api/manifest/:videoId', async (req, res) => {
+app.get('/api/stream/:videoId', async (req, res) => {
   const { videoId } = req.params;
   try {
-    const info = await yt.getInfo(videoId, { client: 'TV_EMBEDDED' });
-    const origin = req.protocol + '://' + req.get('host');
-
-    const manifest = await info.toDash(url => {
-      return `${origin}/proxy?url=${encodeURIComponent(url)}`;
-    });
-
-    res.set('Content-Type', 'application/dash+xml');
-    res.set('Access-Control-Allow-Origin', '*');
-    res.send(manifest);
+    const data = await getFormats(videoId);
+    res.json(data);
   } catch (e) {
-    console.error('[MANIFEST ERROR]', e.message);
+    console.error('[STREAM]', e.message);
     res.status(500).json({ error: e.message });
-  }
-});
-
-// === ストリームプロキシ ===
-app.get('/proxy', async (req, res) => {
-  const targetUrl = req.query.url;
-  if (!targetUrl) return res.status(400).send('Missing url');
-  try {
-    const headers = { 'User-Agent': 'Mozilla/5.0' };
-    if (req.headers.range) headers.Range = req.headers.range;
-
-    const upstream = await fetch(targetUrl, { headers });
-
-    if (!upstream.ok) {
-      return res.status(upstream.status).send('Upstream error');
-    }
-
-    res.set('Content-Type', upstream.headers.get('content-type') || 'video/mp4');
-    res.set('Accept-Ranges', 'bytes');
-    if (upstream.status === 206) {
-      res.status(206);
-      res.set('Content-Range', upstream.headers.get('content-range'));
-    }
-    if (upstream.headers.get('content-length')) {
-      res.set('Content-Length', upstream.headers.get('content-length'));
-    }
-
-    const reader = upstream.body.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      res.write(Buffer.from(value));
-    }
-    res.end();
-  } catch (e) {
-    res.status(502).send(e.message);
   }
 });
 

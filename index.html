@@ -158,19 +158,19 @@ function generateDashManifest(video, audio){
   return `<?xml version="1.0"?>
 <MPD type="static" mediaPresentationDuration="99999.000" minBufferTime="4.000" profiles="urn:mpeg:dash:profile:full:2011" xmlns="urn:mpeg:dash:schema:mpd:2011">
   <Period duration="99999.000">
-    <AdaptationSet mimeType="${video.mimeType}" segmentAlignment="true">
+    <AdaptationSet mimeType="${video.mime_type}" segmentAlignment="true">
       <Representation id="v${video.itag}" bandwidth="5000000" codecs="avc1.640028" height="${video.height}" width="1920">
         <BaseURL>${video.url}</BaseURL>
       </Representation>
     </AdaptationSet>
-    <AdaptationSet mimeType="${audio.mimeType}" segmentAlignment="true">
+    <AdaptationSet mimeType="${audio.mime_type}" segmentAlignment="true">
       <Representation id="a${audio.itag}" bandwidth="128000" codecs="mp4a.40.2">
         <BaseURL>${audio.url}</BaseURL>
       </Representation>
     </AdaptationSet>
   </Period>
 </MPD>`;
-}
+}   
 
 function switchQuality(){
   const url=document.getElementById('q-sel').value;

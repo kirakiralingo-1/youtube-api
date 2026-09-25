@@ -29,9 +29,6 @@ header h1{font-size:20px;cursor:pointer;white-space:nowrap}
 .player-page video{width:100%;aspect-ratio:16/9;border-radius:12px;background:#000}
 .player-page h2{margin-top:12px;font-size:18px}
 .player-page .ch{color:#aaa;font-size:14px;margin-top:4px}
-.player-page .q-sel{margin-top:12px;display:flex;align-items:center;gap:8px}
-.player-page .q-sel label{font-size:13px;color:#aaa}
-.player-page .q-sel select{padding:6px 12px;background:#222;color:#fff;border:1px solid #555;border-radius:6px}
 .back-btn{display:inline-block;margin-bottom:12px;color:#4fc3f7;cursor:pointer;font-size:14px}
 .loading{text-align:center;padding:40px;color:#888}
 .err{color:#f66;padding:20px}
@@ -39,13 +36,13 @@ header h1{font-size:20px;cursor:pointer;white-space:nowrap}
 </head>
 <body>
 <header>
-  <h1 onclick="goHome()">▶ YT ☆</h1>
+  <h1 onclick="goHome()">▶ YT Stream</h1>
   <div class="search-box">
     <input id="q" placeholder="検索..." onkeydown="if(event.key==='Enter')doSearch()">
     <button onclick="doSearch()">検索</button>
   </div>
   <div class="tabs">
-    <button id="tab-t" class="active" onclick="showTrend()">人気</button>
+    <button id="tab-t" class="active" onclick="showTrend()">トレンド</button>
     <button id="tab-s" onclick="showSearchTab()">検索</button>
   </div>
 </header>
@@ -56,10 +53,6 @@ header h1{font-size:20px;cursor:pointer;white-space:nowrap}
   <video id="vid" controls playsinline></video>
   <h2 id="v-title"></h2>
   <p class="ch" id="v-ch"></p>
-  <div class="q-sel" id="q-wrap" style="display:none">
-    <label>品質:</label>
-    <select id="q-sel" onchange="switchQuality()"></select>
-  </div>
 </div>
 
 <script>
@@ -93,7 +86,7 @@ async function loadGrid(url){
     (d.items||[]).forEach(v=>{
       const div=document.createElement('div');
       div.className='card';
-      div.onclick=()=>play(v.id);
+      div.onclick=()=>play(v.id,v.title,v.channel);
       div.innerHTML=`<div class="thumb"><img src="${v.thumbnail}" loading="lazy" onerror="this.onerror=null;this.src='https://img.youtube.com/vi/${v.id}/hqdefault.jpg'"><span class="dur">${esc(v.duration)}</span></div>
         <div class="info"><div class="title">${esc(v.title)}</div>
         <div class="meta">${esc(v.channel)} · ${esc(v.views)}</div></div>`;
@@ -107,75 +100,20 @@ async function loadGrid(url){
 
 function destroyPlayer(){
   if(dashPlayer){ dashPlayer.reset(); dashPlayer=null; }
-  const vid=document.getElementById('vid');
-  vid.src=''; vid.load();
 }
 
-async function play(id){
+function play(id,title,channel){
   document.getElementById('grid').style.display='none';
   document.getElementById('player-page').style.display='block';
-  document.getElementById('v-title').textContent='読み込み中...';
-  document.getElementById('v-ch').textContent='';
-  document.getElementById('q-wrap').style.display='none';
-  document.getElementById('q-sel').innerHTML='';
+  document.getElementById('v-title').textContent=title||'読み込み中...';
+  document.getElementById('v-ch').textContent=channel||'';
   destroyPlayer();
 
-  try{
-    const d=await fetch('/api/stream/'+id).then(r=>r.json());
-    if(d.error) throw new Error(d.error);
-
-    document.getElementById('v-title').textContent=d.title;
-    document.getElementById('v-ch').textContent=d.channel;
-    const vid=document.getElementById('vid');
-
-    if(d.directUrl){
-      vid.src=d.directUrl;
-      vid.play();
-      if(d.qualities?.length>1){
-        document.getElementById('q-wrap').style.display='flex';
-        const sel=document.getElementById('q-sel');
-        d.qualities.forEach(q=>{
-          const opt=document.createElement('option');
-          opt.value=q.url;
-          opt.textContent=q.quality;
-          sel.appendChild(opt);
-        });
-      }
-    } else if(d.dashVideo && d.dashAudio){
-      const manifest = generateDashManifest(d.dashVideo, d.dashAudio);
-      const uri = "data:application/dash+xml;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(manifest)));
-      dashPlayer = dashjs.MediaPlayer().create();
-      dashPlayer.initialize(vid, uri, true);
-    } else {
-      document.getElementById('v-title').textContent='再生可能なストリームが見つかりません';
-    }
-  }catch(e){
-    document.getElementById('v-title').textContent='エラー: '+e.message;
-  }
+  const vid=document.getElementById('vid');
+  dashPlayer = dashjs.MediaPlayer().create();
+  dashPlayer.initialize(vid, '/api/manifest/'+id, true);
 }
 
-function generateDashManifest(video, audio){
-  return `<?xml version="1.0"?>
-<MPD type="static" mediaPresentationDuration="99999.000" minBufferTime="4.000" profiles="urn:mpeg:dash:profile:full:2011" xmlns="urn:mpeg:dash:schema:mpd:2011">
-  <Period duration="99999.000">
-    <AdaptationSet mimeType="${video.mime_type}" segmentAlignment="true">
-      <Representation id="v${video.itag}" bandwidth="5000000" codecs="avc1.640028" height="${video.height}" width="1920">
-        <BaseURL>${video.url}</BaseURL>
-      </Representation>
-    </AdaptationSet>
-    <AdaptationSet mimeType="${audio.mime_type}" segmentAlignment="true">
-      <Representation id="a${audio.itag}" bandwidth="128000" codecs="mp4a.40.2">
-        <BaseURL>${audio.url}</BaseURL>
-      </Representation>
-    </AdaptationSet>
-  </Period>
-</MPD>`;
-}   
-
-function switchQuality(){
-  const url=document.getElementById('q-sel').value;
-  if(url){ destroyPlayer(); const vid=document.getElementById('vid'); vid.src=url; vid.play(); }
-}
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 showTrend();
 </script>

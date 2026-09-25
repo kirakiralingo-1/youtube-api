@@ -1,20 +1,17 @@
-const express = require('express');
-const path = require('path');
-const { Innertube } = require('youtubei.js');
+import express from 'express';
+import path from 'path';
+import { Innertube } from 'youtubei.js';
+
 const app = express();
+app.use(express.static(path.join(path.dirname(new URL(import.meta.url).pathname))));
 
-app.use(express.static(path.join(__dirname)));
+// Innertubeセッション（1回だけ）
+const yt = await Innertube.create();
 
-// Innertubeセッション（1回だけ生成）
-const yt = await Innertube.create({
-  cache: { static: true },
-  generate_session_locally: true
-});
-
-// === トレンド ===
+// === トレンド代替（人気検索） ===
 app.get('/api/trending', async (req, res) => {
   try {
-    const data = await yt.getTrending({ region: 'JP' });
+    const data = await yt.search('人気', { type: 'video' });
     const items = (data.videos || []).slice(0, 50).map(v => ({
       id: v.id,
       title: v.title,
@@ -32,9 +29,10 @@ app.get('/api/trending', async (req, res) => {
 // === 検索 ===
 app.get('/api/search', async (req, res) => {
   const q = req.query.q || '';
+  if (!q) return res.json({ items: [] });
   try {
     const data = await yt.search(q, { type: 'video' });
-    const items = (data.vid || data.videos || []).slice(0, 50).map(v => ({
+    const items = (data.videos || []).slice(0, 50).map(v => ({
       id: v.id,
       title: v.title,
       channel: v.author?.name || '',
@@ -52,65 +50,47 @@ app.get('/api/search', async (req, res) => {
 app.get('/api/stream/:videoId', async (req, res) => {
   const { videoId } = req.params;
   try {
-    const info = await yt.getBasicInfo(videoId, { client: 'WEB' });
+    const info = await yt.getBasicInfo(videoId);
     const title = info.title || '';
     const channel = info.author?.name || '';
 
-    // 全形式を署名復号して取得
-    const allFormats = [];
-    const formats = info.streaming_data?.formats || [];
-    const adaptive = info.streaming_data?.adaptive_formats || [];
+    // progressive（動画+音声一体型）を優先
+    const progressive = info.streaming_data?.formats
+      ?.filter(f => f.mimeType?.includes('video/mp4'))
+      .sort((a, b) => (b.height || 0) - (a.height || 0)) || [];
 
-    for (const f of [...formats, ...adaptive]) {
+    let directUrl = null;
+    let qualities = [];
+
+    for (const f of progressive) {
       try {
         const url = await f.decipher(yt.session.player);
         if (url) {
-          allFormats.push({
-            itag: f.itag,
-            url,
-            mimeType: f.mimeType || '',
-            height: f.height || 0,
-            quality: f.quality || '',
-            type: f.type || (f.mimeType?.includes('audio') ? 'audio' : 'video'),
-            container: f.container || ''
-          });
+          qualities.push({ url, height: f.height, quality: f.quality || `${f.height}p` });
         }
-      } catch (_) { /* 復号失敗はスキップ */ }
+      } catch (_) {}
+    }
+    directUrl = qualities[0]?.url || null;
+
+    // DASH用（progressiveがない場合）
+    let dashVideo = null, dashAudio = null;
+    const adaptive = info.streaming_data?.adaptive_formats || [];
+
+    const bestV = adaptive.filter(f => f.mimeType?.includes('video')).sort((a,b) => (b.height||0)-(a.height||0))[0];
+    const bestA = adaptive.filter(f => f.mimeType?.includes('audio/mp4'))[0];
+
+    if (bestV) {
+      try { dashVideo = { url: await bestV.decipher(yt.session.player), mimeType: bestV.mimeType, height: bestV.height, itag: bestV.itag }; } catch(_){}
+    }
+    if (bestA) {
+      try { dashAudio = { url: await bestA.decipher(yt.session.player), mimeType: bestA.mimeType, itag: bestA.itag }; } catch(_){}
     }
 
-    // progressive（動画+音声一体型）を優先
-    const progressive = allFormats
-      .filter(f => f.type === 'videoandaudio' || f.mimeType?.includes('video/mp4'))
-      .sort((a, b) => b.height - a.height);
-
-    // 最高画質のvideo-only + 最高画質のaudio（DASH用）
-    const videoOnly = allFormats
-      .filter(f => f.type === 'video' && f.mimeType?.includes('video'))
-      .sort((a, b) => b.height - a.height);
-    const audioOnly = allFormats
-      .filter(f => f.type === 'audio')
-      .sort((a, b) => (b.mimeType?.includes('mp4a') ? 1 : 0) - (a.mimeType?.includes('mp4a') ? 1 : 0));
-
-    res.json({
-      title,
-      channel,
-      // progressive直接URL（最もシンプル）
-      directUrl: progressive[0]?.url || null,
-      directHeight: progressive[0]?.height || 0,
-      // 品質リスト
-      qualities: progressive.map(f => ({
-        url: f.url,
-        height: f.height,
-        quality: f.quality || `${f.height}p`
-      })),
-      // DASH用（progressiveがない場合）
-      dashVideo: videoOnly[0] || null,
-      dashAudio: audioOnly[0] || null
-    });
+    res.json({ title, channel, directUrl, qualities, dashVideo, dashAudio });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Running on :${PORT}`));   
+app.listen(PORT, '0.0.0.0', () => console.log(`Running on :${PORT}`));   

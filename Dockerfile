@@ -1,14 +1,16 @@
-FROM node:22-slim
+FROM ghcr.io/imputnet/cobalt:latest
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip && \
-    rm -rf /var/lib/apt/lists/* && \
-    pip3 install --break-system-packages "yt-dlp[default]"
+# PO Token Provider（YouTube用）を同梱
+RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm && \
+    cd /opt && git clone --depth 1 https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git pot && \
+    cd pot/server && npm install && npx tsc && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+COPY server.js ./
+COPY index.html ./
 COPY package.json ./
 RUN npm install --production
-COPY . .
 
 EXPOSE 3000
-CMD ["node", "server.js"]   
+CMD ["sh", "-c", "cd /opt/pot/server && node build/main.js & sleep 3 && node server.js"]   

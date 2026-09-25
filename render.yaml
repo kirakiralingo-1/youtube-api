@@ -1,7 +1,6 @@
 services:
   - type: web
     name: yt-stream
-    runtime: node
+    runtime: docker
     plan: free
-    buildCommand: npm install
-    startCommand: npm start   
+    dockerfilePath: Dockerfile   

@@ -8,7 +8,7 @@
 </head>
 <body>
   <header>
-    <a class="logo" href="#">▶ YT Clone</a>
+    <a class="logo" href="#">▶ YT C</a>
     <div class="search-bar">
       <input id="q" type="text" placeholder="動画を検索..." autocomplete="off"/>
       <button id="searchBtn">検索</button>
@@ -23,14 +23,13 @@
     <div id="grid" class="grid"></div>
   </main>
 
-  <!-- プレイヤーオーバーレイ -->
   <div id="overlay" class="overlay hidden">
     <button id="closeBtn" class="close-btn">&times;</button>
     <div id="playerWrap">
       <video id="videoEl" controls playsinline style="display:none"></video>
       <div id="dashWrap" style="display:none">
-        <video id="dashVideo" style="width:100%;height:100%" muted playsinline></video>
-        <audio id="dashAudio" style="display:none"></audio>
+        <video id="dashVideo" muted playsinline></video>
+        <audio id="dashAudio"></audio>
       </div>
       <div id="loading" class="loading">読み込み中…</div>
     </div>

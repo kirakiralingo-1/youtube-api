@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tube</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <a href="/" class="logo">Tube</a>
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="動画を検索..." autocomplete="off">
+      <button id="searchBtn">検索</button>
+    </div>
+  </header>
+
+  <main id="app">
+    <div id="view-trending" class="view">
+      <h2>日本トレンド</h2>
+      <div id="trending-grid" class="grid"></div>
+    </div>
+    <div id="view-search" class="view" style="display:none">
+      <h2 id="search-title"></h2>
+      <div id="search-grid" class="grid"></div>
+    </div>
+    <div id="view-watch" class="view" style="display:none">
+      <div class="player-wrap">
+        <video id="player" controls playsinline></video>
+      </div>
+      <div id="video-meta"></div>
+      <div id="related-grid" class="grid"></div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>   

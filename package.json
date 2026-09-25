@@ -4,8 +4,5 @@
   "type": "module",
   "main": "server.js",
   "scripts": { "start": "node server.js" },
-  "dependencies": {
-    "express": "^4.18.0",
-    "youtubei.js": "^16.0.1"
-  }
+  "dependencies": { "express": "^4.18.0" }
 }   

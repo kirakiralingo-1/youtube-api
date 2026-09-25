@@ -8,12 +8,16 @@ const app = express();
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 app.use(express.static(__dirname));
 
+// ★ tvクライアント = PO Token不要・bot検知されにくい
+const YT_ARGS = [
+  '--extractor-args', 'youtube:player_client=tv,web_embedded',
+  '--no-warnings', '--no-playlist'
+];
+
 async function getFormats(videoId) {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
   const { stdout } = await execFileAsync('yt-dlp', [
-    '--extractor-args', 'youtube:player_client=mweb',
-    '--dump-json', '--no-warnings', '--no-playlist',
-    url
+    ...YT_ARGS, '--dump-json', url
   ], { timeout: 30000, maxBuffer: 10 * 1024 * 1024 });
 
   const data = JSON.parse(stdout);
@@ -44,7 +48,7 @@ async function getFormats(videoId) {
 
 async function searchVideos(query) {
   const { stdout } = await execFileAsync('yt-dlp', [
-    '--flat-playlist', '--dump-json', '--no-warnings',
+    ...YT_ARGS, '--flat-playlist', '--dump-json',
     `ytsearch20:${query}`
   ], { timeout: 30000, maxBuffer: 10 * 1024 * 1024 });
 

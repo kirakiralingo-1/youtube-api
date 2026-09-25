@@ -3,4 +3,5 @@ services:
     name: yt-stream
     runtime: docker
     plan: free
-    dockerfilePath: Dockerfile   
+    dockerfilePath: Dockerfile
+    autoDeploy: true   

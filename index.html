@@ -39,13 +39,13 @@ header h1{font-size:20px;cursor:pointer;white-space:nowrap}
 </head>
 <body>
 <header>
-  <h1 onclick="goHome()">▶ YT</h1>
+  <h1 onclick="goHome()">▶ YT ☆</h1>
   <div class="search-box">
     <input id="q" placeholder="検索..." onkeydown="if(event.key==='Enter')doSearch()">
     <button onclick="doSearch()">検索</button>
   </div>
   <div class="tabs">
-    <button id="tab-t" class="active" onclick="showTrend()">トレンド</button>
+    <button id="tab-t" class="active" onclick="showTrend()">人気</button>
     <button id="tab-s" onclick="showSearchTab()">検索</button>
   </div>
 </header>
@@ -64,7 +64,6 @@ header h1{font-size:20px;cursor:pointer;white-space:nowrap}
 
 <script>
 let dashPlayer = null;
-let currentQualities = [];
 
 function goHome(){
   destroyPlayer();
@@ -72,7 +71,6 @@ function goHome(){
   document.getElementById('grid').style.display='grid';
   showTrend();
 }
-
 function showTrend(){ setTab('t'); loadGrid('/api/trending'); }
 function showSearchTab(){ setTab('s'); const q=document.getElementById('q').value.trim(); if(q)doSearch(); }
 function doSearch(){
@@ -110,8 +108,7 @@ async function loadGrid(url){
 function destroyPlayer(){
   if(dashPlayer){ dashPlayer.reset(); dashPlayer=null; }
   const vid=document.getElementById('vid');
-  vid.src='';
-  vid.load();
+  vid.src=''; vid.load();
 }
 
 async function play(id){
@@ -132,11 +129,9 @@ async function play(id){
     const vid=document.getElementById('vid');
 
     if(d.directUrl){
-      // progressive直接URL → <video> で再生
       vid.src=d.directUrl;
       vid.play();
       if(d.qualities?.length>1){
-        currentQualities=d.qualities;
         document.getElementById('q-wrap').style.display='flex';
         const sel=document.getElementById('q-sel');
         d.qualities.forEach(q=>{
@@ -147,7 +142,6 @@ async function play(id){
         });
       }
     } else if(d.dashVideo && d.dashAudio){
-      // DASH manifestを生成してdash.jsで再生
       const manifest = generateDashManifest(d.dashVideo, d.dashAudio);
       const uri = "data:application/dash+xml;charset=utf-8;base64," + btoa(unescape(encodeURIComponent(manifest)));
       dashPlayer = dashjs.MediaPlayer().create();
@@ -161,7 +155,6 @@ async function play(id){
 }
 
 function generateDashManifest(video, audio){
-  const ts = new Date().toISOString().replace(/[-:]/g,'').replace('T','_').split('.')[0];
   return `<?xml version="1.0"?>
 <MPD type="static" mediaPresentationDuration="99999.000" minBufferTime="4.000" profiles="urn:mpeg:dash:profile:full:2011" xmlns="urn:mpeg:dash:schema:mpd:2011">
   <Period duration="99999.000">
@@ -181,17 +174,10 @@ function generateDashManifest(video, audio){
 
 function switchQuality(){
   const url=document.getElementById('q-sel').value;
-  if(url){
-    destroyPlayer();
-    const vid=document.getElementById('vid');
-    vid.src=url;
-    vid.play();
-  }
+  if(url){ destroyPlayer(); const vid=document.getElementById('vid'); vid.src=url; vid.play(); }
 }
-
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
-
 showTrend();
 </script>
 </body>
-</html   
+</html>   
